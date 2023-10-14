@@ -151,13 +151,213 @@ And the large p-value from the Ljung-Box test confirms the differenced log(GDP) 
 
 * Accommodation takings in the state of Tasmania from aus_accommodation
 
+```{r ex9_3g}
+data(aus_accommodation)
+keep <- c("Date", "State", "Takings")
+tasmania_takings <- aus_accommodation |>
+    select(all_of(keep)) |>
+    filter(State == "Tasmania")
+p6 <- tasmania_takings |>
+    autoplot(Takings) +
+    labs(title = "Quarterly Takings in Tasmania")
+p6
 
+```
+
+```{r ex9_3h}
+lam <- tasmania_takings |>
+    features(Takings, features = guerrero) |>
+    pull(lambda_guerrero)
+lam <- round(lam, 3)
+
+```
+
+The ideal lambda proposed for a Box-Cox transformation is $\approx 0.002$, so we will round down and use a log transformation again.
+
+```{r ex9_3i}
+tasmania_takings <- tasmania_takings |>
+    mutate(Log_Takings = log(Takings))
+p7 <- tasmania_takings |>
+    autoplot(Log_Takings) +
+    labs(title = "Quarterly log(Takings) in Tasmania")
+p7
+
+```
+
+There is strong evidence of seasonality in the plot of log(Takings), so we will determine the appropriate number of seasonal differences, then the appropriate number of first differences for the data.
+
+```{r ex9_3j}
+nsdiffs <- tasmania_takings |>
+    features(Log_Takings, unitroot_nsdiffs) |>
+    select(-State)
+colnames(nsdiffs) <- "Appropriate N: Seasonal Differences"
+ndiffs <- tasmania_takings |>
+    features(Log_Takings, unitroot_ndiffs) |>
+    select(-State)
+colnames(ndiffs) <- "Appropriate N: First Differences"
+diffs <- cbind(nsdiffs, ndiffs)
+kable(diffs, format = "simple")
+
+```
+
+The appropriate number of seasonal differences is one, and the appropriate number of first differences is one. Now we can doubly difference the data and confirm we've made it stationary:
+
+```{r ex9_3k, warning = FALSE, message = FALSE}
+p8 <- tasmania_takings |>
+    transmute(
+        `Annual Change log(Takings)` = difference(Log_Takings, 4),
+        `Doubly Diff. log(Takings)` = difference(difference(
+            Log_Takings, 4), 1)) |>
+    pivot_longer(-Date, names_to="Type", values_to="Log_Takings") |>
+    mutate(Type = factor(Type, levels = c("Annual Change log(Takings)",
+                                          "Doubly Diff. log(Takings)"))) |>
+    ggplot(aes(x = Date, y = Log_Takings)) +
+    geom_line() +
+    facet_grid(vars(Type), scales = "free_y") +
+    labs(title = "Tasmanian Takings", y = NULL)
+p8 
+
+```
+
+The data now appear stationary.
 
 * Monthly sales from souvenirs
+
+```{r ex9_3l}
+data(souvenirs)
+p9 <- souvenirs |>
+    autoplot(Sales) +
+    labs(title = "Monthly Souvenir Sales")
+p9
+
+```
+
+```{r ex9_3m}
+lam <- souvenirs |>
+    features(Sales, features = guerrero) |>
+    pull(lambda_guerrero)
+lam <- round(lam, 3)
+
+```
+
+The ideal lambda proposed for a Box-Cox transformation is again $\approx 0.002$, so we will round down and use a log transformation yet again.
+
+```{r ex9_3n}
+souvenirs <- souvenirs |>
+    mutate(Log_Sales = log(Sales))
+p10 <- souvenirs |>
+    autoplot(Log_Sales) +
+    labs(title = "Monthly Souvenir log(Sales)")
+p10
+
+```
+
+There is strong evidence of seasonality in the plot of log(Sales), so we will determine the appropriate number of seasonal differences, then the appropriate number of first differences for the data.
+
+```{r ex9_3o}
+nsdiffs <- souvenirs |>
+    features(Log_Sales, unitroot_nsdiffs)
+colnames(nsdiffs) <- "Appropriate N: Seasonal Differences"
+ndiffs <- souvenirs |>
+    features(Log_Sales, unitroot_ndiffs)
+colnames(ndiffs) <- "Appropriate N: First Differences"
+diffs <- cbind(nsdiffs, ndiffs)
+kable(diffs, format = "simple")
+
+```
+
+The appropriate number of seasonal differences is one, and the appropriate number of first differences is one. Now we can doubly difference the data and confirm we've made it stationary:
+
+```{r ex9_3p, warning = FALSE, message = FALSE}
+p11 <- souvenirs |>
+    transmute(
+        `Annual Change log(Sales)` = difference(Log_Sales, 12),
+        `Doubly Diff. log(Sales)` = difference(difference(
+            Log_Sales, 12), 1)) |>
+    pivot_longer(-Month, names_to="Type", values_to="Log_Sales") |>
+    mutate(Type = factor(Type, levels = c("Annual Change log(Sales)",
+                                          "Doubly Diff. log(Sales)"))) |>
+    ggplot(aes(x = Month, y = Log_Sales)) +
+    geom_line() +
+    facet_grid(vars(Type), scales = "free_y") +
+    labs(title = "Souvenir Sales", y = NULL)
+p11
+
+```
+
+The data now appear stationary.
 
 ## Exercise 9.5:
 
 For your retail data (from Exercise 7 in Section 2.10), find the appropriate order of differencing (after transformation if necessary) to obtain stationary data.
+
+```{r ex9_5a}
+data(aus_retail)
+set.seed(1221)
+remove <- c("State", "Industry", "Series ID")
+my_series <- aus_retail |>
+    filter(`Series ID` == sample(aus_retail$`Series ID`, 1)) |>
+    select(-all_of(remove))
+p12 <- my_series |>
+    autoplot(Turnover)
+p12
+
+```
+
+```{r ex9_5b}
+lam <- my_series |>
+    features(Turnover, features = guerrero) |>
+    pull(lambda_guerrero)
+lam <- round(lam, 2)
+
+```
+
+The ideal lambda proposed for a Box-Cox transformation is $\approx 0.26$, so we will round down and use a fourth root transformation.
+
+```{r ex9_5c}
+my_series <- my_series |>
+    mutate(Turnover_4thRt = nthroot(Turnover, 4))
+p13 <- my_series |>
+    autoplot(Turnover_4thRt) +
+    labs(title = "My Series: Monthly Turnover (Fourth Root)")
+p13
+
+```
+
+We will determine the appropriate number of seasonal differences for the transformed data, then the appropriate number of first differences for the transformed data.
+
+```{r ex9_5d}
+nsdiffs <- my_series |>
+    features(Turnover_4thRt, unitroot_nsdiffs)
+colnames(nsdiffs) <- "Appropriate N: Seasonal Differences"
+ndiffs <- my_series |>
+    features(Turnover_4thRt, unitroot_ndiffs)
+colnames(ndiffs) <- "Appropriate N: First Differences"
+diffs <- cbind(nsdiffs, ndiffs)
+kable(diffs, format = "simple")
+
+```
+
+The appropriate number of seasonal differences is one, and the appropriate number of first differences is one. Now we can doubly difference the data and confirm we've made it stationary:
+
+```{r ex9_5e, warning = FALSE, message = FALSE}
+p14 <- my_series |>
+    transmute(
+        `Annual Change Turnover^1/4` = difference(Turnover_4thRt, 12),
+        `Doubly Diff. Turnover^1/4` = difference(difference(
+            Turnover_4thRt, 12), 1)) |>
+    pivot_longer(-Month, names_to="Type", values_to="Turnover_4thRt") |>
+    mutate(Type = factor(Type, levels = c("Annual Change Turnover^1/4",
+                                          "Doubly Diff. Turnover^1/4"))) |>
+    ggplot(aes(x = Month, y = Turnover_4thRt)) +
+    geom_line() +
+    facet_grid(vars(Type), scales = "free_y") +
+    labs(title = "My Series: Turnover", y = NULL)
+p14
+
+```
+
+The data now appear stationary.
 
 ## Exercise 9.6:
 
