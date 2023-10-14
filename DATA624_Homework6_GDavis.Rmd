@@ -377,7 +377,45 @@ sim <- tsibble(idx = seq_len(100), y = y, index = idx)
 
 * Produce a time plot for the series. How does the plot change as you change $\phi_1$?
 
+```{r ex9_6b}
+p15 <- sim |>
+    autoplot(y)
+p15
+
+```
+
+```{r ex9_6c}
+phis = seq(from = -0.9, to = 0.9, by = 0.1)
+sim_df <- as.data.frame(matrix(ncol = 2, nrow = 0))
+colnames(sim_df) <- c("phi_val", "y")
+for (j in 1:length(phis)){
+    y <- numeric(100)
+    e <- rnorm(100)
+    phi <- phis[j]
+    phi_val <- (y + 1) * phi
+    for (i in 2:100){
+        y[i] <- (phi * y[i-1]) + e[i]
+    }
+    idx <- seq_len(100)
+    new_rows <- cbind(idx, phi_val, y)
+    sim_df <- rbind(sim_df, new_rows)
+}
+sim_ts <- sim_df |>
+    as_tsibble(index = idx, key = phi_val)
+p16 <- sim_ts |>
+    autoplot(y) +
+    facet_wrap(~ phi_val, ncol = 5) +
+    theme_minimal() + 
+    theme(legend.position = "none")
+p16
+
+```
+
+Changing $\phi_1$ from $-0.9$ to $0.9$ in intervals of $0.1$ results in different time series patterns. For all $-0.9 \le \phi_1 < 0$, the time series patterns frequently oscillate around the mean. The absolute value of the back and forth swings is the largest, and the swings are most frequent, when $phi_1$ is smallest (i.e. $-0.9$). For all $0.9 \ge \phi_1 \ge 0$, the time series patterns no longer oscillate around the mean, and changes in these different patterns become less frequent. 
+
 * Write your own code to generate data from an MA(1) model with $\theta_1 = 0.6$ and $\sigma^2 = 1$.
+
+
 
 * Produce a time plot for the series. How does the plot change as you change $\theta_1$?
 
