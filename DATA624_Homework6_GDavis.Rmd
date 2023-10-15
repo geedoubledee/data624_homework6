@@ -379,7 +379,8 @@ sim <- tsibble(idx = seq_len(100), y = y, index = idx)
 
 ```{r ex9_6b}
 p15 <- sim |>
-    autoplot(y)
+    autoplot(y) +
+    labs(title = "Sim 1:")
 p15
 
 ```
@@ -406,38 +407,238 @@ p16 <- sim_ts |>
     autoplot(y) +
     facet_wrap(~ phi_val, ncol = 5) +
     theme_minimal() + 
-    theme(legend.position = "none")
+    theme(legend.position = "none") +
+    labs(title = expression(paste("Repeated Simulations with Various ", phi[1],
+    " Values")))
 p16
 
 ```
 
-Changing $\phi_1$ from $-0.9$ to $0.9$ in intervals of $0.1$ results in different time series patterns. For all $-0.9 \le \phi_1 < 0$, the time series patterns frequently oscillate around the mean. The absolute value of the back and forth swings is the largest, and the swings are most frequent, when $phi_1$ is smallest (i.e. $-0.9$). For all $0.9 \ge \phi_1 \ge 0$, the time series patterns no longer oscillate around the mean, and changes in these different patterns become less frequent. 
+Changing $\phi_1$ from $-0.9$ to $0.9$ in intervals of $0.1$ results in different time series patterns. For all $-0.9 \le \phi_1 < 0$, the time series patterns frequently oscillate around the mean. The absolute value of the back and forth swings is the largest, and the swings are most frequent, when $phi_1$ is smallest (i.e. $-0.9$). For all $0.9 \ge \phi_1 \ge 0$, the time series patterns no longer oscillate around the mean, and changes in these different patterns become less frequent. Because $\phi_1 < 1$ for all values of $\phi_1$ here, the most recent observations always have higher weight than observations from the more distant past.
 
 * Write your own code to generate data from an MA(1) model with $\theta_1 = 0.6$ and $\sigma^2 = 1$.
 
+```{r ex9_6d}
+y <- numeric(100)
+e <- rnorm(100)
+for (i in 2:100){
+    y[i] <- (0.6 * e[i-1]) + e[i]
+}
+sim2 <- tsibble(idx = seq_len(100), y = y, index = idx)
 
+```
 
 * Produce a time plot for the series. How does the plot change as you change $\theta_1$?
 
+```{r ex9_6e}
+p17 <- sim2 |>
+    autoplot(y) +
+    labs(title = "Sim 2:")
+p17
+
+```
+```{r ex9_6f}
+thetas = seq(from = -0.9, to = 0.9, by = 0.1)
+sim_df2 <- as.data.frame(matrix(ncol = 2, nrow = 0))
+colnames(sim_df2) <- c("theta_val", "y")
+for (j in 1:length(thetas)){
+    y <- numeric(100)
+    e <- rnorm(100)
+    theta <- thetas[j]
+    theta_val <- (y + 1) * theta
+    for (i in 2:100){
+        y[i] <- (theta * e[i-1]) + e[i]
+    }
+    idx <- seq_len(100)
+    new_rows <- cbind(idx, theta_val, y)
+    sim_df2 <- rbind(sim_df2, new_rows)
+}
+sim_ts2 <- sim_df2 |>
+    as_tsibble(index = idx, key = theta_val)
+p18 <- sim_ts2 |>
+    autoplot(y) +
+    facet_wrap(~ theta_val, ncol = 5) +
+    theme_minimal() + 
+    theme(legend.position = "none") +
+    labs(title = expression(paste("Repeated Simulations with Various ", theta[1],
+    " Values")))
+p18
+
+```
+
+Changing $\theta_1$ from $-0.9$ to $0.9$ in intervals of $0.1$ results in different time series patterns, just like changing $\phi_1$ did. The smaller the value of $\theta_1$, the more frequently the data oscillate back and forth around the mean. Because $\theta_1 < 1$ for all values of $\theta_1$ here, the most recent observations again always have higher weight than observations from the more distant past.
+
 * Generate data from an ARMA(1,1) model with $\phi_1 = 0.6$, $\theta_1 = 0.6$, and $\sigma^2 = 1$.
+
+```{r ex9_6g}
+y <- numeric(100)
+e <- rnorm(100)
+for (i in 2:100){
+    y[i] <- (0.6 * y[i-1]) + (0.6 * e[i-1]) + e[i]
+}
+sim3 <- tsibble(idx = seq_len(100), y = y, index = idx)
+
+```
 
 * Generate data from an AR(2) model with $\phi_1 = -0.8$, $\phi_2 = 0.3$, and $\sigma^2 = 1$. (Note that these parameters will give a non-stationary series.)
 
+```{r ex9_6h}
+y <- numeric(100)
+e <- rnorm(100)
+for (i in 3:100){
+    y[i] <- (-0.8 * y[i-1]) + (0.3 * y[i-2]) + e[i]
+}
+sim4 <- tsibble(idx = seq_len(100), y = y, index = idx)
+
+```
+
 * Graph the latter two series and compare them.
+
+```{r ex9_6i}
+p19a <- sim3 |>
+    autoplot(y) +
+    labs(title = "Sim 3:")
+p19b <- sim4 |>
+    autoplot(y) +
+    labs(title = "Sim 4:")
+p19 <- plot_grid(p19a, p19b)
+p19
+
+```
+
+The ARMA(1,1) model (Sim 3) is stationary. Because $\phi_1 = \theta_1 < 1$ here, the most recent observations always have higher weight than observations from the more distant past. The AR(2) model (Sim 4) is non-stationary. Because $\phi_1 < 0$, we see oscillation around the mean. The swings back and forth get larger and larger.
 
 ## Exercise 9.7:
 
 Consider aus_airpassengers, the total number of passengers (in millions) from Australian air carriers for the period 1970-2011.
 
-* Use ARIMA() to find an appropriate ARIMA model. What model was selected. Check that the residuals look like white noise. Plot forecasts for the next 10 periods.
+* Use ARIMA() to find an appropriate ARIMA model. What model was selected? Check that the residuals look like white noise. Plot forecasts for the next 10 periods.
+
+```{r ex9_7a}
+data(aus_airpassengers)
+p20 <- aus_airpassengers |>
+    autoplot(Passengers)
+p20
+
+```
+
+```{r ex9_7b}
+lam <- aus_airpassengers |>
+    features(Passengers, features = guerrero) |>
+    pull(lambda_guerrero)
+lam <- round(lam, 2)
+
+```
+
+With a proposed lambda transformation of $-0.18$, a log transformation is probably necessary, but we will skip it so the following questions are less complicated to answer as written. 
+
+```{r ex9_7d}
+cols <- c("stepwise", "search")
+fit <- aus_airpassengers |>
+    model(stepwise = ARIMA(Passengers),
+          search = ARIMA(Passengers, stepwise=FALSE))
+pivot_fit <- fit |>
+    pivot_longer(cols = all_of(cols), names_to = "Model Name",
+                 values_to = "Orders")
+kable(pivot_fit, format = "simple")
+
+```
+
+```{r ex9_7e}
+glance_fit <- glance(fit) |>
+    arrange(AICc) |>
+    select(.model:BIC)
+kable(glance_fit, format = "simple")
+
+```
+
+Both the default stepwise ARIMA() procedure and the more extensive search procedure selected the same model: ARIMA(0,2,1).
+
+We check that the residuals look like white noise.
+
+```{r ex9_7f}
+fit |>
+    select(stepwise) |>
+    gg_tsresiduals()
+
+```
+
+The residuals do in fact look like white noise.
+
+We plot forecasts for the next 10 periods.
+
+```{r ex9_7g}
+p22a <- fit |>
+    forecast(h=10) |>
+    filter(.model == "stepwise") |>
+    autoplot(aus_airpassengers) +
+    labs(subtitle = "AUS Air Passengers: ARIMA(0,2,1) Forecasts")
+p22a
+
+```
 
 * Write the model in terms of the backshift operator.
 
+$(1 - B)^2y_t = (1 + \theta_1B)\epsilon_t$
+
 * Plot forecasts from an ARIMA(0,1,0) model with drift and compare these to part a.
+
+```{r ex9_7h}
+fit <- aus_airpassengers |>
+    model(arima010c = ARIMA(Passengers ~ 1 + pdq(0,1,0)))
+p22b <- fit |>
+    forecast(h=10) |>
+    filter(.model == "arima010c") |>
+    autoplot(aus_airpassengers) +
+    labs(subtitle = "AUS Air Passengers: ARIMA(0,1,0) w/ Drift Forecasts")
+p22b
+
+```
+
+The forecasts from the ARIMA(0,1,0) w/ drift model are very similar to the forecasts from the ARIMA(0,2,1) forecasts. Forecasts from the former are slightly less optimistic. The prediction intervals in the latter model are wider than the prediction intervals in the former. 
 
 * Plot forecasts from an ARIMA(2,1,2) model with drift and compare these to parts a and c. Remove the constant and see what happens.
 
+```{r ex9_7l, warning = FALSE, message = FALSE}
+fit <- aus_airpassengers |>
+    model(arima212c = ARIMA(Passengers ~ 1 + pdq(2, 1, 2)),
+          arima212 = ARIMA(Passengers ~ 0 + pdq(2, 1, 2)),
+          arima021c = ARIMA(Passengers ~ 1 + pdq(0, 2, 1)))
+p23 <- fit |>
+    forecast(h=10) |>
+    filter(.model == "arima212c") |>
+    autoplot(aus_airpassengers) +
+    labs(subtitle = "AUS Air Passengers: ARIMA(2,1,2) w/ Drift Forecasts")
+p23
+
+```
+
+The forecasts aren't very different, but they and the prediction intervals wobble. 
+```{r ex9_7m, warning = FALSE, message = FALSE}
+p24 <- fit |>
+    forecast(h=10) |>
+    filter(.model == "arima212") |>
+    autoplot(aus_airpassengers) +
+    labs(subtitle = "AUS Air Passengers: ARIMA(2,1,2) Forecasts")
+p24
+
+```
+
+Removing the constant has resulted in a NULL model for which forecasts can't be produced/plotted.
+
 * Plot forecasts from an ARIMA(0,2,1) model with a constant. What happens?
+
+```{r ex9_7n}
+p25 <- fit |>
+    forecast(h=10) |>
+    filter(.model == "arima021c") |>
+    autoplot(aus_airpassengers) +
+    labs(subtitle = "AUS Air Passengers: ARIMA(0,2,1) w/ Drift Forecasts")
+p25
+
+```
+
+The forecasts become more optimistic. We've been warned that including a constant and an order of differencing $\ge 2$ is dangerous when forecasting.
 
 ## Exercise 9.8:
 
