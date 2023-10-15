@@ -32,7 +32,7 @@ The differences in these figures can be explained by the increasing sample size 
 
 * Why are the critical values at different distances from the mean of zero? Why are the autocorrelations different in each figure when they each refer to white noise?
 
-The critical values are at different distances from the mean of zero because when n is relatively small, i.e. 36, the correlation between any two of these values at any lag varies more than when n is relatively large, i.e. 360 or 1,000. The autocorrelation is measured as an average, so when n is relatively small, the denominator is relatively small, and even uncorrelated data, such as white noise, have larger absolute values of autocorrelation at any lag. As n increases, the relatively larger denominator stabilizes the the variation in correlation. As such, the blue bounds of the ACF plot will be wider for small n than large n because it takes a smaller difference in the absolute value of autocorrelation to generate the abnormal spikes we need to see to distinguish autocorrelated data from white noise. 
+The critical values are at different distances from the mean of zero because when n is relatively small, i.e. 36, the correlation between any two of these values at any lag varies more than when n is relatively large, i.e. 360 or 1,000. The autocorrelation is measured as an average, so when n is relatively small, the denominator is relatively small, and even uncorrelated data, such as white noise, have larger absolute values of autocorrelation at any lag. As n increases, the relatively larger denominator stabilizes the variation in correlation. As such, the blue bounds of the ACF plot will be wider for small n than large n because it takes a smaller difference in the absolute value of autocorrelation to generate the abnormal spikes we need to see to distinguish autocorrelated data from white noise. 
 
 ## Exercise 9.2:
 
@@ -71,7 +71,7 @@ p2
 
 The ACF plot of the Amazon daily closing stock price shows two more pieces of evidence indicating the data are non-stationary: the ACF decreases very slowly for this time series, and the value of $r_1$ is large and positive.
 
-If the PACF provides additional evidence the data are non-stationary, other than confirming the value of $r_1$ is large and positive, it's unclear to me. I thought analyzing the PACF was only useful for selecting values of p or q for ARIMA models for stationary data (i.e. non-stationary data that has already been differenced).
+If the PACF provides additional evidence the data are non-stationary, other than confirming the value of $r_1$ is large and positive, it's unclear to us. We thought analyzing the PACF was only useful for selecting values of p or q for ARIMA models for stationary data (i.e. non-stationary data that has already been differenced).
 
 ## Exercise 9.3:
 
@@ -414,7 +414,7 @@ p16
 
 ```
 
-Changing $\phi_1$ from $-0.9$ to $0.9$ in intervals of $0.1$ results in different time series patterns. For all $-0.9 \le \phi_1 < 0$, the time series patterns frequently oscillate around the mean. The absolute value of the back and forth swings is the largest, and the swings are most frequent, when $phi_1$ is smallest (i.e. $-0.9$). For all $0.9 \ge \phi_1 \ge 0$, the time series patterns no longer oscillate around the mean, and changes in these different patterns become less frequent. Because $\phi_1 < 1$ for all values of $\phi_1$ here, the most recent observations always have higher weight than observations from the more distant past.
+Changing $\phi_1$ from $-0.9$ to $0.9$ in intervals of $0.1$ results in different time series patterns. For all $-0.9 \le \phi_1 < 0$, the time series patterns frequently oscillate around the mean. The absolute value of the back and forth swings is the largest, and the swings are most frequent, when $\phi_1$ is smallest (i.e. $-0.9$). For all $0.9 \ge \phi_1 \ge 0$, the time series patterns no longer oscillate around the mean, and changes in these different patterns become less frequent. Because $\phi_1 < 1$ for all values of $\phi_1$ here, the most recent observations always have higher weight than observations from the more distant past.
 
 * Write your own code to generate data from an MA(1) model with $\theta_1 = 0.6$ and $\sigma^2 = 1$.
 
@@ -646,12 +646,123 @@ For the United States GDP series (from global_economy):
 
 * If necessary, find a suitable Box-Cox transformation for the data;
 
+```{r ex9_8a}
+keep <- c("Country", "Year", "GDP")
+us_gdp <- global_economy |>
+    select(all_of(keep)) |>
+    filter(Country == "United States")
+p26 <- us_gdp |>
+    autoplot(GDP) +
+    labs(title = "Annual United States GDP in USD")
+p26
+
+```
+
+```{r ex9_8b}
+lam <- us_gdp |>
+    features(GDP, features = guerrero) |>
+    pull(lambda_guerrero)
+lam <- round(lam, 2)
+
+```
+
+With a proposed lambda of $0.28$, we round down to $0.25$, a fourth root transformation.
+
 * Fit a suitable ARIMA model to the transformed data using ARIMA();
+
+```{r ex9_8c}
+lam <- 0.25
+fit1 <- us_gdp |>
+    model(stepwise = ARIMA(box_cox(GDP, lam)),
+          search = ARIMA(box_cox(GDP, lam), stepwise = FALSE))
+pivot_fit <- fit1 |>
+    pivot_longer(-Country, names_to = "Model Name",
+                 values_to = "Orders")
+kable(pivot_fit, format = "simple")
+
+```
+
+```{r ex9_8d}
+glance_fit <- glance(fit1) |>
+    arrange(AICc) |>
+    select(.model:BIC)
+kable(glance_fit, format = "simple")
+
+```
 
 * Try some other plausible models by experimenting with the orders chosen;
 
+```{r ex9_8f}
+fit2 <- us_gdp |>
+    model(arima011 = ARIMA(box_cox(GDP, lam) ~ 1 + pdq(0,1,1)),
+          arima211 = ARIMA(box_cox(GDP, lam) ~ 1 + pdq(2,1,1)))
+pivot_fit <- fit2 |>
+    pivot_longer(-Country, names_to = "Model Name",
+                 values_to = "Orders")
+kable(pivot_fit, format = "simple")
+
+```
+
+```{r ex9_8g}
+glance_fit <- glance(fit2) |>
+    arrange(AICc) |>
+    select(.model:BIC)
+kable(glance_fit, format = "simple")
+
+```
+
 * Choose what you think is the best model and check the residual diagnostics;
+
+The stepwise model produced by ARIMA() had the lowest AICc (identical to the model produced by the more exhaustive search procedure), so that model is the best. We check the residual diagnostics.
+
+```{r ex9_8h}
+fit1 |>
+    select(stepwise) |>
+    gg_tsresiduals()
+
+```
+
+The residuals look like white noise.
 
 * Produce forecasts of your fitted model. Do the forecasts look reasonable?
 
+```{r ex9_8i}
+p27 <- fit1 |>
+    forecast(h=10) |>
+    filter(.model == "stepwise") |>
+    autoplot(us_gdp) +
+    labs(subtitle = "US GDP: ARIMA(1,1,0) w/ Drift Forecasts")
+p27
+
+```
+
+Yes, the forecasts look reasonable. 
+
 * Compare the results with what you would obtain using ETS() (with no transformation).
+
+```{r ex9_8j}
+compare <- us_gdp |> 
+    slice(-n()) |>
+    stretch_tsibble(.init = 10) |>
+    model(ETS(GDP),
+          ARIMA(box_cox(GDP, lam))) |>
+    forecast(h = 1) |>
+    accuracy(us_gdp) |>
+    select(.model, RMSE:MAPE)
+kable(compare, format = "simple")
+
+```
+
+```{r ex9_8k}
+fit3 <- us_gdp |>
+    model(ETS = ETS(GDP))
+p28 <- fit3 |>
+    forecast(h=10) |>
+    filter(.model == "ETS") |>
+    autoplot(us_gdp) +
+    labs(subtitle = "US GDP: ETS Forecasts")
+p28
+
+```
+
+ETS() is less accurate by comparison. Its forecasts are less optimistic, and its prediction intervals are much wider, although ARIMA prediction intervals will always tend to be too narrow.
